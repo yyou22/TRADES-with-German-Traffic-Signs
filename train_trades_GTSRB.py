@@ -57,8 +57,10 @@ kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 # setup data loader
 transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
+    #transforms.RandomCrop(32, padding=4),
+    transforms.Resize((32, 32)),
     #transforms.RandomHorizontalFlip(), --> flipping would change the meaning of signs
+    transforms.RandomRotation(20),
     transforms.ToTensor(),
 ])
 transform_test = transforms.Compose([
@@ -71,11 +73,14 @@ transform_test = transforms.Compose([
 #test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 trainset = torchvision.datasets.ImageFolder(
-    './data/GTSRB/Final_Training/Images/',
+    './data/GTSRB-Train/Final_Training/Images/',
     transform = transform_train
 )
 
+#trainset = torchvision.datasets.GTSRB(root='./data/GTSRB/', split='train', download=True, transform=transform_train)
 train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
+
+print(len(trainset))
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
