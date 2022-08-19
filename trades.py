@@ -9,10 +9,8 @@ def squared_l2_norm(x):
     flattened = x.view(x.unsqueeze(0).shape[0], -1)
     return (flattened ** 2).sum(1)
 
-
 def l2_norm(x):
     return squared_l2_norm(x).sqrt()
-
 
 def trades_loss(model,
                 x_natural,

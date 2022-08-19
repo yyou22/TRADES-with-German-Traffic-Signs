@@ -71,7 +71,7 @@ transform_test = transforms.Compose([
 #test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 trainset = torchvision.datasets.ImageFolder(
-    './data/GTSRB-Training/Final_Training/Images/',
+    './data/GTSRB/Final_Training/Images/',
     transform = transform_train
 )
 
@@ -85,14 +85,15 @@ def train(args, model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
 
         # calculate robust loss
-        loss = trades_loss(model=model,
-                           x_natural=data,
-                           y=target,
-                           optimizer=optimizer,
-                           step_size=args.step_size,
-                           epsilon=args.epsilon,
-                           perturb_steps=args.num_steps,
-                           beta=args.beta)
+        loss = F.cross_entropy(model(data), target)
+        #loss = trades_loss(model=model,
+                           #x_natural=data,
+                           #y=target,
+                           #optimizer=optimizer,
+                           #step_size=args.step_size,
+                           #epsilon=args.epsilon,
+                           #perturb_steps=args.num_steps,
+                           #beta=args.beta)
         loss.backward()
         optimizer.step()
 
