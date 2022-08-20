@@ -8,6 +8,7 @@ import torchvision
 import torch.optim as optim
 from torchvision import datasets, transforms
 
+from GTSRB import GTSRB_Test
 from models.wideresnet import *
 from models.resnet import *
 from trades import trades_loss
@@ -37,7 +38,7 @@ parser.add_argument('--beta', default=6.0,
                     help='regularization, i.e., 1/lambda in TRADES')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+parser.add_argument('--log-interval', type=int, default=50, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--model-dir', default='./model-gtsrb-ResNet',
                     help='directory of model for saving checkpoint')
@@ -73,20 +74,22 @@ transform_test = transforms.Compose([
 #test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 trainset = torchvision.datasets.ImageFolder(
-    './data/GTSRB-Train/Final_Training/Images/',
+    '/content/data/GTSRB-Train/Final_Training/Images/',
     transform = transform_train
+)
+testset = GTSRB_Test(
+    root_dir='/content/data/GTSRB-Test/Final_Test/Images/',
+    transform=transform_test
 )
 
 #trainset = torchvision.datasets.GTSRB(root='./data/GTSRB/', split='train', download=True, transform=transform_train)
 train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
-
-print(len(trainset))
+test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
-
         optimizer.zero_grad()
 
         # calculate robust loss
@@ -135,6 +138,7 @@ def eval_test(model, device, test_loader):
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
+            print(target)
             output = model(data)
             test_loss += F.cross_entropy(output, target, size_average=False).item()
             pred = output.max(1, keepdim=True)[1]
@@ -175,7 +179,7 @@ def main():
         # evaluation on natural examples
         print('================================================================')
         eval_train(model, device, train_loader)
-        #eval_test(model, device, test_loader) --> readd later
+        eval_test(model, device, test_loader)
         print('================================================================')
 
         # save checkpoint
