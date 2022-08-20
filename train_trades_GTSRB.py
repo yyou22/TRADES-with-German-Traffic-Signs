@@ -65,6 +65,7 @@ transform_train = transforms.Compose([
     transforms.ToTensor(),
 ])
 transform_test = transforms.Compose([
+    transforms.Resize((32, 32)),
     transforms.ToTensor(),
 ])
 
@@ -138,7 +139,6 @@ def eval_test(model, device, test_loader):
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            print(target)
             output = model(data)
             test_loss += F.cross_entropy(output, target, size_average=False).item()
             pred = output.max(1, keepdim=True)[1]

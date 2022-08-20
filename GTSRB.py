@@ -22,7 +22,7 @@ class GTSRB_Test(Dataset):
         csv_file_path = os.path.join(
             self.root_dir, self.csv_file_name)
 
-        self.csv_data = pd.read_csv(csv_file_path)
+        self.csv_data = pd.read_csv(csv_file_path, sep=';', usecols=["Filename", "ClassId"])
 
         self.transform = transform
 
@@ -33,7 +33,7 @@ class GTSRB_Test(Dataset):
         img_path = os.path.join(self.root_dir, self.csv_data.iloc[idx, 0])
         img = Image.open(img_path)
 
-        classId = self.csv_data.iloc[idx, -1]
+        classId = self.csv_data.iloc[idx, 1]
 
         if self.transform is not None:
             img = self.transform(img)
