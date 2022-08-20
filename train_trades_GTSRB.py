@@ -13,6 +13,10 @@ from models.wideresnet import *
 from models.resnet import *
 from trades import trades_loss
 
+import mlflow
+import mlflow.pytorch
+import time
+
 parser = argparse.ArgumentParser(description='PyTorch CIFAR TRADES Adversarial Training')
 parser.add_argument('--batch-size', type=int, default=128, metavar='N',
                     help='input batch size for training (default: 128)')
@@ -22,7 +26,7 @@ parser.add_argument('--epochs', type=int, default=76, metavar='N',
                     help='number of epochs to train')
 parser.add_argument('--weight-decay', '--wd', default=2e-4,
                     type=float, metavar='W')
-parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
+parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum')
@@ -88,6 +92,9 @@ train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
 test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 def train(args, model, device, train_loader, optimizer, epoch):
+    #mlflow
+    start_time = last_logging = time.time()
+
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
@@ -105,6 +112,17 @@ def train(args, model, device, train_loader, optimizer, epoch):
                            #beta=args.beta)
         loss.backward()
         optimizer.step()
+
+        #mlflow
+        current_time = time.time()
+        stats = dict(
+                    epoch=epoch,
+                    step=batch_idx,
+                    loss=loss.item(),
+                    time=int(current_time - start_time)
+                )
+        for key, value in stats.items():
+            mlflow.log_metric(key, value, step=batch_idx)
 
         # print progress
         if batch_idx % args.log_interval == 0:
@@ -178,9 +196,14 @@ def main():
 
         # evaluation on natural examples
         print('================================================================')
-        eval_train(model, device, train_loader)
-        eval_test(model, device, test_loader)
+        train_loss, train_accuracy = eval_train(model, device, train_loader)
+        test_loss, test_accuracy = eval_test(model, device, test_loader)
         print('================================================================')
+
+        mlflow.log_metric("train_loss", train_loss, step=epoch)
+        mlflow.log_metric("train_accuracy", train_accuracy, step=epoch)
+        mlflow.log_metric("test_loss", test_loss, step=epoch)
+        mlflow.log_metric("test_accuracy", test_accuracy, step=epoch)
 
         # save checkpoint
         if epoch % args.save_freq == 0:
@@ -191,4 +214,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    mlflow.set_tracking_uri("databricks")
+    expr_name = "/Users/y28you@uwaterloo.ca/MLflow-GTSRB"
+    try:
+        mlflow.set_experiment(expr_name)
+    except Exception as e:
+        # print (e)
+        experiment = mlflow.get_experiment_by_name(expr_name)
+    with mlflow.start_run() as run:  
+        # Log our parameters into mlflow
+        for key, value in vars(args).items():
+            mlflow.log_param(key, value)
+        main()
