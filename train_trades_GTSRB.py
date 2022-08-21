@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torchvision
 import torch.optim as optim
 from torchvision import datasets, transforms
+from torchvision.models import resnet101, ResNet101_Weights
 
 from GTSRB import GTSRB_Test
 from models.wideresnet import *
@@ -18,11 +19,11 @@ import mlflow.pytorch
 import time
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR TRADES Adversarial Training')
-parser.add_argument('--batch-size', type=int, default=128, metavar='N',
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 128)')
-parser.add_argument('--test-batch-size', type=int, default=128, metavar='N',
+parser.add_argument('--test-batch-size', type=int, default=64, metavar='N',
                     help='input batch size for testing (default: 128)')
-parser.add_argument('--epochs', type=int, default=76, metavar='N',
+parser.add_argument('--epochs', type=int, default=20, metavar='N',
                     help='number of epochs to train')
 parser.add_argument('--weight-decay', '--wd', default=2e-4,
                     type=float, metavar='W')
@@ -62,14 +63,13 @@ kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 # setup data loader
 transform_train = transforms.Compose([
+    transforms.Resize((96, 96)),
     #transforms.RandomCrop(32, padding=4),
-    transforms.Resize((32, 32)),
-    #transforms.RandomHorizontalFlip(), --> flipping would change the meaning of signs
-    transforms.RandomRotation(20),
+    transforms.RandomRotation(15),
     transforms.ToTensor(),
 ])
 transform_test = transforms.Compose([
-    transforms.Resize((32, 32)),
+    transforms.Resize((96, 96)),
     transforms.ToTensor(),
 ])
 
@@ -172,11 +172,11 @@ def eval_test(model, device, test_loader):
 def adjust_learning_rate(optimizer, epoch):
     """decrease the learning rate"""
     lr = args.lr
-    if epoch >= 75:
+    if epoch >= 5:
         lr = args.lr * 0.1
-    if epoch >= 90:
+    if epoch >= 10:
         lr = args.lr * 0.01
-    if epoch >= 100:
+    if epoch >= 15:
         lr = args.lr * 0.001
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -184,7 +184,11 @@ def adjust_learning_rate(optimizer, epoch):
 
 def main():
     # init model, ResNet18() can be also used here for training
-    model = ResNet101().to(device)
+    #model = ResNet101().to(device)
+    model = resnet101(weights=ResNet101_Weights.DEFAULT)
+    model.fc = nn.Linear(2048, 43)
+    model = model.to(device)
+
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     for epoch in range(1, args.epochs + 1):
@@ -221,7 +225,7 @@ if __name__ == '__main__':
     except Exception as e:
         # print (e)
         experiment = mlflow.get_experiment_by_name(expr_name)
-    with mlflow.start_run() as run:  
+    with mlflow.start_run() as run:
         # Log our parameters into mlflow
         for key, value in vars(args).items():
             mlflow.log_param(key, value)
