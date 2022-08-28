@@ -8,12 +8,17 @@ import torchvision
 from torch.autograd import Variable
 import torch.optim as optim
 from torchvision import datasets, transforms
+from torchvision.models import resnet101, ResNet101_Weights
+import matplotlib.pyplot as plt
+
 from models.wideresnet import *
 from models.resnet import *
+from GTSRB import GTSRB_Test
+
 
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR PGD Attack Evaluation')
-parser.add_argument('--test-batch-size', type=int, default=200, metavar='N',
+parser.add_argument('--test-batch-size', type=int, default=64, metavar='N',
                     help='input batch size for testing (default: 200)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
@@ -27,13 +32,13 @@ parser.add_argument('--random',
                     default=True,
                     help='random initialization for PGD')
 parser.add_argument('--model-path',
-                    default='./checkpoints/model_cifar_wrn.pt',
+                    default='./checkpoints/model_gtsrb_wrn.pt',
                     help='model for white-box attack evaluation')
 parser.add_argument('--source-model-path',
-                    default='./checkpoints/model_cifar_wrn.pt',
+                    default='./checkpoints/model_gtsrb_wrn.pt',
                     help='source model for black-box attack evaluation')
 parser.add_argument('--target-model-path',
-                    default='./checkpoints/model_cifar_wrn.pt',
+                    default='./checkpoints/model_gtsrb_wrn.pt',
                     help='target model for black-box attack evaluation')
 parser.add_argument('--white-box-attack', default=True,
                     help='whether perform white-box attack')
@@ -46,8 +51,15 @@ device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 # set up data loader
-transform_test = transforms.Compose([transforms.ToTensor(),])
-testset = torchvision.datasets.CIFAR10(root='../data', train=False, download=True, transform=transform_test)
+transform_test = transforms.Compose([
+  transforms.Resize((96, 96)),
+  transforms.ToTensor(),
+])
+#testset = torchvision.datasets.CIFAR10(root='../data', train=False, download=True, transform=transform_test)
+testset = GTSRB_Test(
+    root_dir='/content/data/GTSRB-Test/Final_Test/Images/',
+    transform=transform_test
+)
 test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 
@@ -57,6 +69,10 @@ def _pgd_whitebox(model,
                   epsilon=args.epsilon,
                   num_steps=args.num_steps,
                   step_size=args.step_size):
+    
+    plt.imshow(X.cpu().detach().numpy()[0].transpose(1 , 2 , 0))
+    plt.show()
+
     out = model(X)
     err = (out.data.max(1)[1] != y.data).float().sum()
     X_pgd = Variable(X.data, requires_grad=True)
@@ -77,6 +93,10 @@ def _pgd_whitebox(model,
         X_pgd = Variable(X.data + eta, requires_grad=True)
         X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
     err_pgd = (model(X_pgd).data.max(1)[1] != y.data).float().sum()
+
+    plt.imshow(X_pgd.cpu().detach().numpy()[0].transpose(1 , 2 , 0))
+    plt.show()
+
     print('err pgd (white-box): ', err_pgd)
     return err, err_pgd
 
@@ -156,7 +176,10 @@ def main():
     if args.white_box_attack:
         # white-box attack
         print('pgd white-box attack')
-        model = WideResNet().to(device)
+        #model = WideResNet().to(device)
+        model = resnet101()
+        model.fc = nn.Linear(2048, 43)
+        model = model.to(device)
         model.load_state_dict(torch.load(args.model_path))
 
         eval_adv_test_whitebox(model, device, test_loader)
